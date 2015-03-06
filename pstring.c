@@ -1,89 +1,5 @@
-#include <string.h>
-#include <stdint.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <x86intrin.h>
 #define PSTRING_C_TEST
-
-#define OFFSET_OF(TYPE, FIELD) ((unsigned long)&(((TYPE *)0)->FIELD))
-#define PSTRING_PTR(STR) ((STR)->str)
-
-typedef struct pstring_t {
-    unsigned len;
-    char str[1];
-} pstring_t;
-
-static pstring_t *pstring_alloc(const char *t, unsigned len)
-{
-    pstring_t *str = (pstring_t *) malloc(sizeof(pstring_t) + len - 1);
-    memcpy(PSTRING_PTR(str), t, len);
-    return str;
-}
-
-static void pstring_delete(pstring_t *str)
-{
-    free(str);
-}
-
-static inline int starts_with_strcmp(const char *p, const char *text, unsigned len)
-{
-    return (strncmp(p, text, len) == 0);
-}
-
-static inline int starts_with_simple(const char *p, const char *text, unsigned len)
-{
-    const char *end = text + len;
-    while (text < end) {
-        if (*p++ != *text++) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-static inline int starts_with_avx2(const char *str, const char *text, unsigned len)
-{
-    uint64_t m, mask;
-    __m256i s = _mm256_loadu_si256((const __m256i *)str);
-    __m256i t = _mm256_loadu_si256((const __m256i *)text);
-    assert(len <= 32);
-    s = _mm256_cmpeq_epi8(s, t);
-    m = _mm256_movemask_epi8(s);
-    mask = ((uint64_t)1 << len) - 1;
-    return ((m & mask) == mask);
-}
-
-int pstring_starts_with(const char *str, const char *text, unsigned len)
-{
-#ifdef __AVX2__
-    if (len <= 32) {
-        return starts_with_avx2(str, text, len);
-    }
-    else
-#endif
-    {
-#if defined(USE_STRCMP)
-        return starts_with_strcmp(str, text, len);
-#else
-        return starts_with_simple(str, text, len);
-#endif
-    }
-}
-
-#if 0
-static int pstring_starts_with_(pstring_t *str, const char *text, unsigned len)
-{
-    const char *p = (const char *)PSTRING_PTR(str);
-    return pstring_starts_with(p, text, len);
-}
-
-static int pstring_starts_with__(pstring_t *str1, pstring_t *str2)
-{
-    return pstring_starts_with_(str1, (const char *)PSTRING_PTR(str2), str2->len);
-}
-#endif
-
-#ifdef PSTRING_C_TEST
+#include "pstring.h"
 #include <stdio.h>
 #include <sys/time.h>
 
@@ -147,12 +63,11 @@ int main(int argc, char const* argv[])
     err  = bench(pstring_starts_with);
 #endif
     puts("use simple");
-    err += bench(starts_with_simple);
+    err += bench(pstring_starts_with_simple);
     puts("use strcmp");
-    err += bench(starts_with_strcmp);
+    err += bench(pstring_starts_with_strcmp);
     if (err == 0) {
         puts("test ok");
     }
     return 0;
 }
-#endif /*pstring_C_TEST*/
