@@ -25,7 +25,15 @@ typedef struct pstring_t {
 static inline const char *pstring_alloc(const char *t, unsigned len)
 {
     pstring_t *str = (pstring_t *) malloc(sizeof(pstring_t) + len);
+    str->len = len;
     memcpy(PSTRING_PTR(str), t, len);
+    return PSTRING_PTR(str);
+}
+
+static inline const char *pstring_alloc2(unsigned len)
+{
+    pstring_t *str = (pstring_t *) malloc(sizeof(pstring_t) + len);
+    str->len = len;
     return PSTRING_PTR(str);
 }
 
